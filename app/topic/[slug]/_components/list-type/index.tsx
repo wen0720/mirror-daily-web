@@ -4,6 +4,7 @@ import List from './list'
 import { PAGE_SIZE } from '@/constants/topic'
 import { SITE_URL } from '@/constants/config'
 import { IMAGE_PATH } from '@/constants/default-path'
+import type { PostData } from '@/utils/data-process'
 
 type Props = {
   slug: string
@@ -22,12 +23,25 @@ export default async function ListTypeListing({ slug }: Props) {
 
   const fetchMorePosts = async (page: number) => {
     'use server'
-    const { postsData } = await fetchListTypeTopicPostBySlug({
-      slug,
-      take: PAGE_SIZE,
-      page,
-    })
-    return postsData
+    const globalStart = (page - 1) * PAGE_SIZE
+    const globalEnd = page * PAGE_SIZE
+
+    // 每個 JSON 檔的實際筆數不固定，動態累積直到取得足夠的資料
+    const accumulated: PostData[] = []
+    let fileNum = 1
+
+    while (accumulated.length < globalEnd) {
+      const { postsData } = await fetchListTypeTopicPostBySlug({
+        slug,
+        take: 0,
+        page: fileNum,
+      })
+      if (postsData.length === 0) break
+      accumulated.push(...postsData)
+      fileNum++
+    }
+
+    return accumulated.slice(globalStart, globalEnd)
   }
 
   const jsonLd = {
