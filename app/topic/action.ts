@@ -31,7 +31,6 @@ import {
   topicPostSchema,
 } from '@/utils/data-schema'
 import { z } from 'zod'
-import { PAGE_SIZE } from '@/constants/topic'
 import { readStaticJson } from '@/utils/read-static-json'
 
 async function fetchTopicBasicInfo(
@@ -54,15 +53,26 @@ async function fetchTopicBasicInfo(
   }
 }
 
+/**
+ * 取得專題文章。
+ *
+ * 靜態 JSON 以 `fileNum` 指定第幾份檔案，並整份回傳；
+ * 每份檔案的筆數與 UI 分頁的 PAGE_SIZE 不同，多出來的部分交由呼叫端暫存後續渲染，
+ * 藉此避免把「檔案編號」與「UI 頁碼」視為同一件事而導致分頁錯位。
+ *
+ * `take` / `skip` 只在靜態資料源失效、改走 GraphQL 時使用，皆為全域文章序。
+ */
 async function fetchListTypeTopicPostBySlug({
   slug,
   take,
-  page = 1,
+  fileNum = 1,
+  skip = 0,
   withAmount = false,
 }: {
   slug: string
   take: number
-  page?: number
+  fileNum?: number
+  skip?: number
   withAmount?: boolean
 }) {
   const errorLogger = createErrorLogger(
@@ -81,7 +91,7 @@ async function fetchListTypeTopicPostBySlug({
     },
     async () => {
       const rawData = await readStaticJson<{ topic?: unknown }>(
-        `${STATIC_JSON_TOPIC_NEWS}_${slug}_${page}.json`
+        `${STATIC_JSON_TOPIC_NEWS}_${slug}_${fileNum}.json`
       )
 
       const schema = z.object({
@@ -91,9 +101,7 @@ async function fetchListTypeTopicPostBySlug({
 
       const result = schema.parse(rawData?.topic)
 
-      const postsData = take
-        ? result.items.map(transformRawPost).slice(0, take)
-        : result.items.map(transformRawPost)
+      const postsData = result.items.map(transformRawPost)
       const postsCount = result.counts.posts + result.counts.externals
 
       return {
@@ -102,7 +110,6 @@ async function fetchListTypeTopicPostBySlug({
       }
     },
     async () => {
-      const skip = PAGE_SIZE * (page - 1)
       const rawData = await fetchGQLData(
         errorLogger,
         GetListTypeTopcPostsDocument,

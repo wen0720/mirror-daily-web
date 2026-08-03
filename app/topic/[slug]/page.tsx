@@ -70,7 +70,7 @@ export async function generateMetadata({
           slug,
           take: 3,
         })
-        posts = postsData
+        posts = postsData.slice(0, 3)
         break
       }
     }
